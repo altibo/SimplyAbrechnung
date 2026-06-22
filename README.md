@@ -2,7 +2,7 @@
 
 SimplyAbrechnung ist eine bewusst einfache, lokale Patientenkartei mit PDF-Rechnungen für eine kleine Privatpraxis. Die Anwendung benötigt keinen Server und keine Cloud.
 
-Aktuelle Programmversion: **0.2.1**
+Aktuelle Programmversion: **0.3.0**
 
 ## Funktionen
 
@@ -60,6 +60,15 @@ pyinstaller --noconfirm --clean SimplyAbrechnung.spec
 
 Unter macOS wird die virtuelle Umgebung mit `source .venv/bin/activate` aktiviert. Nicht signierte macOS-Builds können beim ersten Start eine Gatekeeper-Warnung auslösen.
 
+## Installation und Updates
+
+- Unter Windows `SimplyAbrechnung-Windows-Setup.exe` aus dem Release starten.
+- Unter macOS `SimplyAbrechnung-macOS.pkg` öffnen; die App wird nach `/Applications` installiert.
+- Eine neue Installer-Version ersetzt die vorhandene Installation automatisch.
+- Der Datenordner `SimplyAbrechnung_Daten` im Benutzerordner bleibt bei Installation und Update unverändert.
+
+Wer bisher die portable Windows-Datei aus einem ZIP verwendet hat, installiert die neue Setup-Version einmalig und kann die alte portable Datei danach entfernen.
+
 ## Veröffentlichungen
 
-Jeder Push auf `main` testet und baut die Anwendung auf Windows und macOS. GitHub Actions stellt beide Pakete als Build-Artefakte bereit und erzeugt zusätzlich eine neue Vorabveröffentlichung mit einer eindeutigen Build-Nummer.
+Jeder Push auf `main` testet und baut die Anwendung auf Windows und macOS. GitHub Actions stellt einen Windows-Setup-Assistenten und ein macOS-Installationspaket als Build-Artefakte bereit und erzeugt zusätzlich eine neue Vorabveröffentlichung mit einer eindeutigen Build-Nummer.

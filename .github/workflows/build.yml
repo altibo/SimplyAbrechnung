@@ -16,8 +16,10 @@ jobs:
         include:
           - os: windows-latest
             artifact: SimplyAbrechnung-Windows
+            package: dist/SimplyAbrechnung-Windows-Setup.exe
           - os: macos-latest
             artifact: SimplyAbrechnung-macOS
+            package: dist/SimplyAbrechnung-macOS.pkg
     runs-on: ${{ matrix.os }}
     steps:
       - name: Quellcode laden
@@ -33,18 +35,33 @@ jobs:
         run: python -m pytest
       - name: Anwendung bauen
         run: pyinstaller --noconfirm --clean SimplyAbrechnung.spec
-      - name: Windows-Paket erstellen
+      - name: Inno Setup installieren
         if: runner.os == 'Windows'
         shell: pwsh
-        run: Compress-Archive -Path dist/SimplyAbrechnung.exe -DestinationPath dist/SimplyAbrechnung-Windows.zip
-      - name: macOS-Paket erstellen
+        run: choco install innosetup --no-progress --yes
+      - name: Windows-Installer erstellen
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $version = (Select-String -Path pyproject.toml -Pattern '^version = "(.*)"$').Matches.Groups[1].Value
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DMyAppVersion=$version" installer/SimplyAbrechnung.iss
+      - name: macOS-Installer erstellen
         if: runner.os == 'macOS'
-        run: ditto -c -k --sequesterRsrc --keepParent dist/SimplyAbrechnung.app dist/SimplyAbrechnung-macOS.zip
+        shell: bash
+        run: |
+          VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' pyproject.toml)
+          pkgbuild \
+            --component dist/SimplyAbrechnung.app \
+            --identifier de.altibo.simplyabrechnung \
+            --version "$VERSION" \
+            --install-location /Applications \
+            dist/SimplyAbrechnung-macOS.pkg
+          pkgutil --payload-files dist/SimplyAbrechnung-macOS.pkg | grep -q 'SimplyAbrechnung.app'
       - name: Build-Artefakt bereitstellen
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
-          path: dist/${{ matrix.artifact }}.zip
+          path: ${{ matrix.package }}
           if-no-files-found: error
 
   release:
@@ -70,9 +87,9 @@ jobs:
         shell: bash
         run: >-
           gh release create "v${VERSION}-build.${GITHUB_RUN_NUMBER}"
-          release/SimplyAbrechnung-Windows.zip
-          release/SimplyAbrechnung-macOS.zip
+          release/SimplyAbrechnung-Windows-Setup.exe
+          release/SimplyAbrechnung-macOS.pkg
           --target "${GITHUB_SHA}"
           --title "SimplyAbrechnung ${VERSION} · Build ${GITHUB_RUN_NUMBER}"
-          --notes "Automatisch getesteter Build für Windows und macOS. Programmversion: ${VERSION}."
+          --notes "Installationspakete mit Upgrade-Unterstützung für Windows und macOS. Programmversion: ${VERSION}."
           --prerelease
