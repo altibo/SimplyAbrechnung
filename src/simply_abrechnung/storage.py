@@ -14,6 +14,15 @@ from .defaults import DEFAULT_CATALOG, DEFAULT_CONFIG
 from .utils import safe_filename
 
 
+def invoice_file_stem(record: dict) -> str:
+    patient = record.get("patient", {})
+    return safe_filename(
+        f"Rechnung_{record.get('rechnungsnummer', '')}_"
+        f"{patient.get('nachname', '')}_{patient.get('vorname', '')}_"
+        f"{record.get('rechnungsdatum', '')}"
+    )
+
+
 def resource_path(relative: str) -> Path:
     base = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[2]))
     return base / relative
@@ -126,9 +135,46 @@ class Storage:
         patient["_path"] = str(new_path)
         return new_path
 
+    def invoice_number_exists(self, number: str) -> bool:
+        safe_number = safe_filename(number)
+        if any(self.invoices_dir.glob(f"Rechnung_{safe_number}*.pdf")):
+            return True
+        for record in self.list_invoice_records():
+            if str(record.get("rechnungsnummer", "")) == str(number):
+                return True
+        return False
+
+    def list_invoice_records(self) -> list[dict]:
+        records = []
+        for path in self.invoices_dir.glob("Rechnung_*.json"):
+            try:
+                record = self.read_json(path)
+                record["_path"] = str(path)
+                records.append(record)
+            except (OSError, ValueError):
+                continue
+        return sorted(records, key=lambda item: item.get("erstellt_am", ""), reverse=True)
+
     def save_invoice_record(self, number: str, record: dict) -> Path:
-        path = self.invoices_dir / f"Rechnung_{safe_filename(number)}.json"
-        if path.exists():
+        if any(str(item.get("rechnungsnummer", "")) == str(number) for item in self.list_invoice_records()):
             raise FileExistsError(f"Die Rechnung {number} existiert bereits.")
+        path = self.invoices_dir / f"{invoice_file_stem(record)}.json"
         self.write_json(path, record, backup=False)
+        record["_path"] = str(path)
         return path
+
+    def update_invoice_record(self, record: dict) -> Path:
+        path_text = record.pop("_path", None)
+        if not path_text:
+            raise ValueError("Der Rechnungsdatensatz hat keinen Speicherpfad.")
+        path = Path(path_text)
+        self.write_json(path, record)
+        record["_path"] = str(path)
+        return path
+
+    def find_invoice_pdf(self, record: dict) -> Path | None:
+        preferred = self.invoices_dir / f"{invoice_file_stem(record)}.pdf"
+        if preferred.exists():
+            return preferred
+        number = safe_filename(str(record.get("rechnungsnummer", "")))
+        return next(self.invoices_dir.glob(f"Rechnung_{number}*.pdf"), None)

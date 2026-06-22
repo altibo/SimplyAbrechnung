@@ -2,7 +2,7 @@
 
 SimplyAbrechnung ist eine bewusst einfache, lokale Patientenkartei mit PDF-Rechnungen für eine kleine Privatpraxis. Die Anwendung benötigt keinen Server und keine Cloud.
 
-Aktuelle Programmversion: **0.3.0**
+Aktuelle Programmversion: **0.4.0**
 
 ## Funktionen
 
@@ -14,8 +14,12 @@ Aktuelle Programmversion: **0.3.0**
 - zentraler, in der Anwendung bearbeitbarer GOÄ-Leistungskatalog
 - nur noch offene Positionen werden in die nächste Rechnung übernommen
 - automatische fortlaufende Rechnungsnummer
+- Rechnungsübersicht mit Zahlungsstatus, Zahlungsdatum und offenen Beträgen
+- Jahresübersicht mit Gesamt-, Bezahlt- und Offen-Summen
+- PDF-Zahlungserinnerungen für offene Rechnungen
+- aussagekräftige Rechnungsdateinamen mit Patient und Datum
 - PDF-Rechnung im Stil des mitgelieferten Vordrucks und mit dessen Original-Logo
-- unveränderlicher JSON-Snapshot zu jeder erstellten Rechnung
+- eigener JSON-Datensatz mit Zahlungshistorie zu jeder erstellten Rechnung
 - automatische Sicherungskopien vor Änderungen
 - sichtbare Versionsnummer in Fenstertitel und Symbolleiste
 
@@ -25,6 +29,7 @@ Aktuelle Programmversion: **0.3.0**
 2. Einen Patienten anlegen und speichern.
 3. Über **Leistung eintragen** datierte GOÄ-Positionen hinzufügen.
 4. **Rechnung aus offenen Positionen erstellen** wählen.
+5. Unter **Rechnungsübersicht** Zahlungen erfassen, Jahreszahlen prüfen oder eine Zahlungserinnerung erstellen.
 
 Die Anwendung speichert ihre Daten unter `SimplyAbrechnung_Daten` im Benutzerordner. Darin liegen:
 

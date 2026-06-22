@@ -11,7 +11,15 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
 from . import __version__
-from .billing import create_invoice, unbilled_services
+from .billing import (
+    annual_totals,
+    create_invoice,
+    create_payment_reminder,
+    invoice_payment_status,
+    invoice_year,
+    set_invoice_payment,
+    unbilled_services,
+)
 from .storage import Storage
 from .utils import euro, parse_euro, today_german, validate_date
 
@@ -278,6 +286,176 @@ class CatalogDialog(tk.Toplevel):
         return result[0] if result else None
 
 
+class InvoiceOverviewDialog(tk.Toplevel):
+    def __init__(self, parent: tk.Misc, storage: Storage):
+        super().__init__(parent)
+        self.title("Rechnungs- und Jahresübersicht")
+        self.geometry("1080x620")
+        self.minsize(850, 480)
+        self.transient(parent)
+        self.grab_set()
+        self.storage = storage
+        self.records: list[dict] = []
+        self.record_by_id: dict[str, dict] = {}
+
+        frame = ttk.Frame(self, padding=12)
+        frame.pack(fill="both", expand=True)
+        filters = ttk.Frame(frame)
+        filters.pack(fill="x", pady=(0, 8))
+        ttk.Label(filters, text="Jahr:").pack(side="left")
+        self.year_var = tk.StringVar(value="Alle Jahre")
+        self.year_combo = ttk.Combobox(filters, textvariable=self.year_var, state="readonly", width=14)
+        self.year_combo.pack(side="left", padx=(6, 18))
+        self.year_combo.bind("<<ComboboxSelected>>", lambda _event: self.refresh())
+        ttk.Label(filters, text="Status:").pack(side="left")
+        self.status_filter_var = tk.StringVar(value="Alle")
+        status_combo = ttk.Combobox(
+            filters, textvariable=self.status_filter_var, values=("Alle", "offen", "bezahlt"), state="readonly", width=11
+        )
+        status_combo.pack(side="left", padx=(6, 18))
+        status_combo.bind("<<ComboboxSelected>>", lambda _event: self.refresh())
+        self.summary_var = tk.StringVar()
+        ttk.Label(filters, textvariable=self.summary_var, font=("TkDefaultFont", 10, "bold")).pack(side="left")
+
+        columns = ("nummer", "datum", "patient", "betrag", "status", "bezahlt", "erinnerung")
+        table_frame = ttk.Frame(frame)
+        table_frame.pack(fill="both", expand=True)
+        self.tree = ttk.Treeview(table_frame, columns=columns, show="headings")
+        settings = [
+            ("nummer", "Rechnung", 90), ("datum", "Datum", 90), ("patient", "Patient", 250),
+            ("betrag", "Betrag", 100), ("status", "Status", 90), ("bezahlt", "Bezahlt am", 100),
+            ("erinnerung", "Letzte Erinnerung", 120),
+        ]
+        for key, label, width in settings:
+            self.tree.heading(key, text=label)
+            self.tree.column(key, width=width, minwidth=70, anchor="w", stretch=key == "patient")
+        scroll = ttk.Scrollbar(table_frame, orient="vertical", command=self.tree.yview)
+        self.tree.configure(yscrollcommand=scroll.set)
+        self.tree.tag_configure("offen", background="#FFF2E8")
+        self.tree.tag_configure("bezahlt", background="#EDF8EE")
+        self.tree.pack(side="left", fill="both", expand=True)
+        scroll.pack(side="left", fill="y")
+        self.tree.bind("<Double-1>", lambda _event: self.open_invoice())
+
+        buttons = ttk.Frame(frame)
+        buttons.pack(fill="x", pady=(10, 0))
+        ttk.Button(buttons, text="Als bezahlt markieren", command=self.mark_paid).pack(side="left", padx=3)
+        ttk.Button(buttons, text="Als offen markieren", command=self.mark_open).pack(side="left", padx=3)
+        ttk.Button(buttons, text="Zahlungserinnerung erstellen", command=self.reminder).pack(side="left", padx=3)
+        ttk.Button(buttons, text="Rechnungs-PDF öffnen", command=self.open_invoice).pack(side="left", padx=3)
+        ttk.Button(buttons, text="Schließen", command=self.destroy).pack(side="right", padx=3)
+
+        self.reload()
+        self.wait_window()
+
+    def reload(self) -> None:
+        self.records = self.storage.list_invoice_records()
+        years = sorted({invoice_year(record) for record in self.records}, reverse=True)
+        values = ["Alle Jahre", *years]
+        self.year_combo.configure(values=values)
+        if self.year_var.get() not in values:
+            self.year_var.set("Alle Jahre")
+        self.refresh()
+
+    def refresh(self) -> None:
+        self.tree.delete(*self.tree.get_children())
+        self.record_by_id.clear()
+        year = self.year_var.get()
+        year_records = self.records if year == "Alle Jahre" else [record for record in self.records if invoice_year(record) == year]
+        status_filter = self.status_filter_var.get()
+        visible = year_records if status_filter == "Alle" else [
+            record for record in year_records if invoice_payment_status(record) == status_filter
+        ]
+        for index, record in enumerate(visible):
+            patient = record.get("patient", {})
+            name = f"{patient.get('nachname', '')}, {patient.get('vorname', '')}".strip(", ")
+            reminders = record.get("zahlungserinnerungen", [])
+            reminder_date = reminders[-1].get("datum", "") if reminders else ""
+            iid = str(record.get("id") or record.get("_path") or index)
+            self.record_by_id[iid] = record
+            status = invoice_payment_status(record)
+            self.tree.insert("", "end", iid=iid, tags=(status,), values=(
+                record.get("rechnungsnummer", ""), record.get("rechnungsdatum", ""), name,
+                euro(int(record.get("gesamt_cent", 0))), status,
+                record.get("bezahlt_am") or "", reminder_date,
+            ))
+        if year == "Alle Jahre":
+            total = sum(int(record.get("gesamt_cent", 0)) for record in year_records)
+            paid = sum(int(record.get("gesamt_cent", 0)) for record in year_records if invoice_payment_status(record) == "bezahlt")
+            open_total = total - paid
+            self.summary_var.set(f"{len(year_records)} Rechnungen · Gesamt {euro(total)} · Bezahlt {euro(paid)} · Offen {euro(open_total)}")
+        else:
+            totals = annual_totals(self.records, year)
+            self.summary_var.set(
+                f"Jahresübersicht {year}: {totals['anzahl']} Rechnungen · Gesamt {euro(totals['gesamt_cent'])} · "
+                f"Bezahlt {euro(totals['bezahlt_cent'])} · Offen {euro(totals['offen_cent'])}"
+            )
+
+    def selected_record(self) -> dict | None:
+        selection = self.tree.selection()
+        if not selection:
+            messagebox.showinfo("Rechnung wählen", "Bitte zuerst eine Rechnung auswählen.", parent=self)
+            return None
+        return self.record_by_id.get(selection[0])
+
+    def mark_paid(self) -> None:
+        record = self.selected_record()
+        if not record:
+            return
+        paid_date = simpledialog.askstring(
+            "Zahlungseingang", "Bezahlt am:", initialvalue=record.get("bezahlt_am") or today_german(), parent=self
+        )
+        if not paid_date:
+            return
+        try:
+            set_invoice_payment(self.storage, record, validate_date(paid_date))
+        except Exception as exc:
+            messagebox.showerror("Zahlungsstatus nicht gespeichert", str(exc), parent=self)
+            return
+        self.refresh()
+
+    def mark_open(self) -> None:
+        record = self.selected_record()
+        if not record:
+            return
+        if not messagebox.askyesno("Zahlungsstatus", "Diese Rechnung wieder als offen markieren?", parent=self):
+            return
+        try:
+            set_invoice_payment(self.storage, record, None)
+        except Exception as exc:
+            messagebox.showerror("Zahlungsstatus nicht gespeichert", str(exc), parent=self)
+            return
+        self.refresh()
+
+    def reminder(self) -> None:
+        record = self.selected_record()
+        if not record:
+            return
+        reminder_date = simpledialog.askstring(
+            "Zahlungserinnerung", "Datum der Zahlungserinnerung:", initialvalue=today_german(), parent=self
+        )
+        if not reminder_date:
+            return
+        try:
+            output = create_payment_reminder(self.storage, record, validate_date(reminder_date))
+        except Exception as exc:
+            messagebox.showerror("Zahlungserinnerung nicht erstellt", str(exc), parent=self)
+            return
+        self.refresh()
+        if messagebox.askyesno("Zahlungserinnerung erstellt", f"PDF wurde gespeichert:\n{output}\n\nJetzt öffnen?", parent=self):
+            open_path(output)
+
+    def open_invoice(self) -> None:
+        record = self.selected_record()
+        if not record:
+            return
+        pdf_path = self.storage.find_invoice_pdf(record)
+        if not pdf_path:
+            messagebox.showerror("PDF nicht gefunden", "Die PDF-Datei dieser Rechnung wurde nicht gefunden.", parent=self)
+            return
+        open_path(pdf_path)
+
+
 class SimplyAbrechnungApp(tk.Tk):
     def __init__(self, storage: Storage | None = None):
         super().__init__()
@@ -306,6 +484,7 @@ class SimplyAbrechnungApp(tk.Tk):
         ttk.Separator(toolbar, orient="vertical").pack(side="left", fill="y", padx=8)
         ttk.Button(toolbar, text="Praxis-Einstellungen", command=lambda: ConfigDialog(self, self.storage)).pack(side="left", padx=3)
         ttk.Button(toolbar, text="GOÄ-Katalog", command=lambda: CatalogDialog(self, self.storage)).pack(side="left", padx=3)
+        ttk.Button(toolbar, text="Rechnungsübersicht", command=lambda: InvoiceOverviewDialog(self, self.storage)).pack(side="left", padx=3)
         ttk.Button(toolbar, text="Datenordner öffnen", command=lambda: open_path(self.storage.root)).pack(side="left", padx=3)
         ttk.Label(toolbar, text=f"Version {__version__}").pack(side="right", padx=6)
 

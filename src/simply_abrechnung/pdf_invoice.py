@@ -62,11 +62,11 @@ def _wrap_lines(text: str, width: float, font: str, size: float) -> list[str]:
     return lines or [""]
 
 
-def _header(c: canvas.Canvas, practice: dict, page: int, logo: ImageReader | None) -> float:
+def _header(c: canvas.Canvas, practice: dict, page: int, logo: ImageReader | None, title: str = "Privatrechnung (GOÄ)") -> float:
     width, height = A4
     c.setFillColor(BLUE)
     c.setFont("VeraBd", 11)
-    c.drawString(20 * MM, height - 19 * MM, f"Privatrechnung (GOÄ) · {practice.get('arzt', '')}")
+    c.drawString(20 * MM, height - 19 * MM, f"{title} · {practice.get('arzt', '')}")
     c.setFillColor(colors.black)
     c.setFont("Vera", 8.5)
     lines = [practice.get("zusatz", ""), practice.get("strasse", ""), practice.get("plz_ort", ""), practice.get("telefon", "")]
@@ -211,4 +211,54 @@ def create_invoice_pdf(record: dict, output: Path) -> None:
     footer = " · ".join(filter(None, [practice.get("arzt", ""), practice.get("telefon", ""), practice.get("email", ""), practice.get("steuernummer", "")]))
     c.setFillColor(colors.HexColor("#555555"))
     c.drawCentredString(width / 2, 12 * MM, footer)
+    c.save()
+
+
+def create_payment_reminder_pdf(record: dict, output: Path, reminder_date: str) -> None:
+    output.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(output), pagesize=A4, pageCompression=1)
+    c.setTitle(f"Zahlungserinnerung zu Rechnung {record['rechnungsnummer']}")
+    c.setAuthor(record["praxis"].get("arzt", ""))
+    patient = record["patient"]
+    practice = record["praxis"]
+    width, _height = A4
+    y = _header(c, practice, 1, _logo(), "Zahlungserinnerung")
+
+    sender = f"{practice.get('arzt', '')} · {practice.get('strasse', '')} · {practice.get('plz_ort', '')}"
+    c.setFont("Vera", 6.5)
+    c.setFillColor(colors.HexColor("#555555"))
+    c.drawString(20 * MM, y, sender)
+    y -= 6 * MM
+    c.setFillColor(colors.black)
+    c.setFont("Vera", 10)
+    name = " ".join(filter(None, [patient.get("anrede", ""), patient.get("vorname", ""), patient.get("nachname", "")]))
+    for line in [name, patient.get("strasse", ""), f"{patient.get('plz', '')} {patient.get('ort', '')}".strip()]:
+        c.drawString(20 * MM, y, line)
+        y -= 5 * MM
+
+    c.setFont("Vera", 9)
+    c.drawRightString(width - 20 * MM, y + 15 * MM, f"Datum: {reminder_date}")
+    y -= 12 * MM
+    c.setFont("VeraBd", 12)
+    c.drawString(20 * MM, y, f"Zahlungserinnerung zu Rechnung {record['rechnungsnummer']}")
+    y -= 10 * MM
+    c.setFont("Vera", 10)
+    y = _draw_wrapped(c, "Sehr geehrte Damen und Herren,", 20 * MM, y, 170 * MM, "Vera", 10, 5 * MM)
+    y -= 5 * MM
+    body = (
+        f"für die Rechnung {record['rechnungsnummer']} vom {record['rechnungsdatum']} "
+        f"über {euro(int(record['gesamt_cent']))} konnten wir bislang keinen Zahlungseingang feststellen. "
+        "Bitte prüfen Sie den Vorgang und überweisen Sie den offenen Betrag zeitnah. "
+        "Sollte die Zahlung bereits erfolgt sein, betrachten Sie dieses Schreiben bitte als gegenstandslos."
+    )
+    y = _draw_wrapped(c, body, 20 * MM, y, 170 * MM, "Vera", 10, 5 * MM)
+    y -= 8 * MM
+    bank = f"Bankverbindung: {practice.get('bank', '')}, IBAN: {practice.get('iban', '')}"
+    y = _draw_wrapped(c, bank, 20 * MM, y, 170 * MM, "Vera", 9, 4.5 * MM)
+    y -= 12 * MM
+    c.setFont("Vera", 10)
+    c.drawString(20 * MM, y, "Mit freundlichen Grüßen")
+    y -= 8 * MM
+    c.setFont("VeraBd", 10)
+    c.drawString(20 * MM, y, practice.get("arzt", ""))
     c.save()

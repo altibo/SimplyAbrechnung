@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "simply-abrechnung"
-version = "0.3.0"
+version = "0.4.0"
 description = "Einfache lokale Patientenkartei und Rechnungsstellung fuer eine kleine Arztpraxis"
 readme = "README.md"
 requires-python = ">=3.11"
