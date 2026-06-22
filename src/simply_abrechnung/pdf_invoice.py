@@ -76,9 +76,6 @@ def _header(c: canvas.Canvas, practice: dict, page: int, logo: ImageReader | Non
         y -= 4 * MM
     if logo:
         c.drawImage(logo, width - 53 * MM, height - 52 * MM, width=36 * MM, height=36 * MM, preserveAspectRatio=True, mask="auto")
-    c.setStrokeColor(BLUE)
-    c.setLineWidth(1)
-    c.line(20 * MM, height - 47 * MM, width - 20 * MM, height - 47 * MM)
     if page > 1:
         c.setFont("Vera", 8)
         c.drawRightString(width - 20 * MM, height - 53 * MM, f"Seite {page}")

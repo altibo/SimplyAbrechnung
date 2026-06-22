@@ -20,7 +20,7 @@ PATIENT_FIELDS = [
     ("anrede", "Anrede"), ("vorname", "Vorname"), ("nachname", "Nachname"),
     ("geburtsdatum", "Geburtsdatum"), ("strasse", "Straße"), ("plz", "PLZ"),
     ("ort", "Ort"), ("telefon", "Telefon"), ("email", "E-Mail"),
-    ("diagnose", "Diagnose"),
+    ("patiententyp", "Patiententyp"), ("diagnose", "Diagnose"),
 ]
 
 
@@ -34,37 +34,50 @@ def open_path(path: Path) -> None:
 
 
 class ServiceDialog(tk.Toplevel):
-    def __init__(self, parent: tk.Misc, catalog: list[dict]):
+    def __init__(self, parent: tk.Misc, catalog: list[dict], service: dict | None = None):
         super().__init__(parent)
-        self.title("Leistung eintragen")
+        self.title("Leistung bearbeiten" if service else "Leistung eintragen")
         self.resizable(True, False)
         self.transient(parent)
         self.grab_set()
         self.result: dict | None = None
         self.catalog = [item for item in catalog if item.get("aktiv", True)]
+        if service and not any(item.get("id") == service.get("katalog_id") for item in self.catalog):
+            self.catalog.append({
+                "id": service.get("katalog_id", f"bestand-{service['id']}"),
+                "nummer": service.get("nummer", ""),
+                "text": service.get("text", ""),
+                "faktor": service.get("faktor", ""),
+                "betrag_cent": int(service.get("einzelbetrag_cent", service.get("gesamt_cent", 0))),
+                "aktiv": True,
+            })
         self.labels = [f"{item['nummer']} · {item['text']} · Faktor {item['faktor']} · {euro(item['betrag_cent'])}" for item in self.catalog]
+        self.service = service
 
         frame = ttk.Frame(self, padding=16)
         frame.grid(sticky="nsew")
         ttk.Label(frame, text="Datum").grid(row=0, column=0, sticky="w", pady=4)
-        self.date_var = tk.StringVar(value=today_german())
+        self.date_var = tk.StringVar(value=service.get("datum", today_german()) if service else today_german())
         ttk.Entry(frame, textvariable=self.date_var, width=14).grid(row=0, column=1, sticky="w", pady=4)
         ttk.Label(frame, text="Leistung").grid(row=1, column=0, sticky="nw", pady=4)
         self.service_var = tk.StringVar()
         combo = ttk.Combobox(frame, textvariable=self.service_var, values=self.labels, state="readonly", width=82)
         combo.grid(row=1, column=1, sticky="ew", pady=4)
         if self.labels:
-            combo.current(0)
+            selected = 0
+            if service:
+                selected = next((index for index, item in enumerate(self.catalog) if item.get("id") == service.get("katalog_id")), 0)
+            combo.current(selected)
         ttk.Label(frame, text="Anzahl").grid(row=2, column=0, sticky="w", pady=4)
-        self.quantity_var = tk.IntVar(value=1)
+        self.quantity_var = tk.IntVar(value=service.get("anzahl", 1) if service else 1)
         ttk.Spinbox(frame, from_=1, to=99, textvariable=self.quantity_var, width=8).grid(row=2, column=1, sticky="w", pady=4)
         ttk.Label(frame, text="Zusatznotiz").grid(row=3, column=0, sticky="w", pady=4)
-        self.note_var = tk.StringVar()
+        self.note_var = tk.StringVar(value=service.get("notiz", "") if service else "")
         ttk.Entry(frame, textvariable=self.note_var, width=70).grid(row=3, column=1, sticky="ew", pady=4)
         buttons = ttk.Frame(frame)
         buttons.grid(row=4, column=0, columnspan=2, sticky="e", pady=(14, 0))
         ttk.Button(buttons, text="Abbrechen", command=self.destroy).pack(side="left", padx=4)
-        ttk.Button(buttons, text="Eintragen", command=self.accept).pack(side="left", padx=4)
+        ttk.Button(buttons, text="Speichern" if service else "Eintragen", command=self.accept).pack(side="left", padx=4)
         frame.columnconfigure(1, weight=1)
         self.bind("<Return>", lambda _event: self.accept())
         self.wait_window()
@@ -81,7 +94,7 @@ class ServiceDialog(tk.Toplevel):
             return
         item = self.catalog[index]
         self.result = {
-            "id": str(uuid.uuid4()),
+            "id": self.service.get("id", str(uuid.uuid4())) if self.service else str(uuid.uuid4()),
             "katalog_id": item["id"],
             "datum": date_value,
             "nummer": item["nummer"],
@@ -91,9 +104,9 @@ class ServiceDialog(tk.Toplevel):
             "einzelbetrag_cent": int(item["betrag_cent"]),
             "gesamt_cent": int(item["betrag_cent"]) * quantity,
             "notiz": self.note_var.get().strip(),
-            "rechnungsnummer": None,
-            "rechnungsdatum": None,
-            "eingetragen_am": datetime.now().isoformat(timespec="seconds"),
+            "rechnungsnummer": self.service.get("rechnungsnummer") if self.service else None,
+            "rechnungsdatum": self.service.get("rechnungsdatum") if self.service else None,
+            "eingetragen_am": self.service.get("eingetragen_am", datetime.now().isoformat(timespec="seconds")) if self.service else datetime.now().isoformat(timespec="seconds"),
         }
         self.destroy()
 
@@ -312,7 +325,11 @@ class SimplyAbrechnungApp(tk.Tk):
             row = index // 2
             col = (index % 2) * 2
             ttk.Label(details, text=label).grid(row=row, column=col, sticky="w", padx=(0, 6), pady=3)
-            ttk.Entry(details, textvariable=self.vars[key], width=35).grid(row=row, column=col + 1, sticky="ew", padx=(0, 14), pady=3)
+            if key == "patiententyp":
+                widget = ttk.Combobox(details, textvariable=self.vars[key], values=("Privatpatient", "Kassenpatient"), state="readonly", width=32)
+            else:
+                widget = ttk.Entry(details, textvariable=self.vars[key], width=35)
+            widget.grid(row=row, column=col + 1, sticky="ew", padx=(0, 14), pady=3)
         details.columnconfigure(1, weight=1)
         details.columnconfigure(3, weight=1)
         notes_row = (len(PATIENT_FIELDS) + 1) // 2
@@ -325,19 +342,22 @@ class SimplyAbrechnungApp(tk.Tk):
         service_buttons = ttk.Frame(services_frame)
         service_buttons.pack(fill="x", pady=(0, 7))
         ttk.Button(service_buttons, text="Leistung eintragen", command=self.add_service).pack(side="left", padx=3)
+        ttk.Button(service_buttons, text="Leistung bearbeiten", command=self.edit_service).pack(side="left", padx=3)
         ttk.Button(service_buttons, text="Offene Leistung löschen", command=self.delete_service).pack(side="left", padx=3)
         ttk.Button(service_buttons, text="Rechnung aus offenen Positionen erstellen", command=self.invoice).pack(side="right", padx=3)
-        columns = ("datum", "nummer", "leistung", "faktor", "anzahl", "betrag", "rechnung")
+        columns = ("datum", "nummer", "leistung", "notiz", "faktor", "anzahl", "betrag", "rechnung")
         self.service_tree = ttk.Treeview(services_frame, columns=columns, show="headings")
         settings = [
             ("datum", "Datum", 85), ("nummer", "GOÄ-Nr.", 75), ("leistung", "Leistung", 380),
-            ("faktor", "Faktor", 55), ("anzahl", "Anz.", 45), ("betrag", "Betrag", 85), ("rechnung", "Rechnung", 90),
+            ("notiz", "Zusatznotiz", 180), ("faktor", "Faktor", 55), ("anzahl", "Anz.", 45),
+            ("betrag", "Betrag", 85), ("rechnung", "Rechnung", 90),
         ]
         for key, label, width in settings:
             self.service_tree.heading(key, text=label)
             self.service_tree.column(key, width=width, anchor="w")
         scroll = ttk.Scrollbar(services_frame, orient="vertical", command=self.service_tree.yview)
         self.service_tree.configure(yscrollcommand=scroll.set)
+        self.service_tree.bind("<Double-1>", lambda _event: self.edit_service())
         self.service_tree.pack(side="left", fill="both", expand=True)
         scroll.pack(side="left", fill="y")
         ttk.Label(self, textvariable=self.status_var, relief="sunken", anchor="w", padding=4).pack(fill="x")
@@ -372,7 +392,8 @@ class SimplyAbrechnungApp(tk.Tk):
         if not self.current:
             return
         for key, _label in PATIENT_FIELDS:
-            self.vars[key].set(self.current.get(key, ""))
+            default = "Privatpatient" if key == "patiententyp" else ""
+            self.vars[key].set(self.current.get(key, default))
         self.notes.delete("1.0", "end")
         self.notes.insert("1.0", self.current.get("notizen", ""))
         self.refresh_services()
@@ -409,7 +430,8 @@ class SimplyAbrechnungApp(tk.Tk):
             status = service.get("rechnungsnummer") or "offen"
             self.service_tree.insert("", "end", iid=service["id"], values=(
                 service.get("datum", ""), service.get("nummer", ""), service.get("text", ""),
-                service.get("faktor", ""), service.get("anzahl", 1), euro(service.get("gesamt_cent", 0)), status,
+                service.get("notiz", ""), service.get("faktor", ""), service.get("anzahl", 1),
+                euro(service.get("gesamt_cent", 0)), status,
             ))
 
     def add_service(self) -> None:
@@ -425,6 +447,30 @@ class SimplyAbrechnungApp(tk.Tk):
             self.storage.save_patient(self.current)
             self.refresh_services()
             self.status_var.set("Leistung eingetragen und Karteikarte gespeichert.")
+
+    def edit_service(self) -> None:
+        if not self.current or not self.service_tree.selection():
+            messagebox.showinfo("Leistung wählen", "Bitte eine offene Leistung auswählen.", parent=self)
+            return
+        service_id = self.service_tree.selection()[0]
+        service = next((item for item in self.current["leistungen"] if item["id"] == service_id), None)
+        if not service:
+            return
+        if service.get("rechnungsnummer"):
+            messagebox.showerror(
+                "Nicht bearbeitbar",
+                "Bereits abgerechnete Leistungen bleiben unverändert. Bitte gegebenenfalls stornieren und neu abrechnen.",
+                parent=self,
+            )
+            return
+        dialog = ServiceDialog(self, self.storage.load_catalog(), service)
+        if dialog.result:
+            index = self.current["leistungen"].index(service)
+            self.current["leistungen"][index] = dialog.result
+            self.storage.save_patient(self.current)
+            self.refresh_services()
+            self.service_tree.selection_set(service_id)
+            self.status_var.set("Leistung bearbeitet und Karteikarte gespeichert.")
 
     def delete_service(self) -> None:
         if not self.current or not self.service_tree.selection():

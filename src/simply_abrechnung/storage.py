@@ -105,6 +105,7 @@ class Storage:
             "ort": "",
             "telefon": "",
             "email": "",
+            "patiententyp": "Privatpatient",
             "diagnose": "",
             "notizen": "",
             "leistungen": [],

@@ -25,6 +25,7 @@ def test_patient_is_human_readable_json(tmp_path):
     assert "Erika" in content
     assert "\n  \"vorname\"" in content
     assert json.loads(content)["nachname"] == "Musterfrau"
+    assert json.loads(content)["patiententyp"] == "Privatpatient"
 
 
 def test_invoice_marks_only_open_services(tmp_path, monkeypatch):
@@ -35,7 +36,7 @@ def test_invoice_marks_only_open_services(tmp_path, monkeypatch):
         "vorname": "Erika", "nachname": "Musterfrau", "strasse": "Testweg 1", "plz": "12345", "ort": "Testort",
         "leistungen": [
             {"id": "old", "datum": "01.01.2026", "nummer": "1", "text": "Alt", "faktor": "2,3", "anzahl": 1, "gesamt_cent": 1000, "rechnungsnummer": "260100"},
-            {"id": "new", "datum": "02.01.2026", "nummer": "3", "text": "Neu", "faktor": "2,3", "anzahl": 1, "gesamt_cent": 2010, "rechnungsnummer": None},
+            {"id": "new", "datum": "02.01.2026", "nummer": "3", "text": "Neu", "notiz": "Hausbesuch", "faktor": "2,3", "anzahl": 1, "gesamt_cent": 2010, "rechnungsnummer": None},
         ],
     })
     storage.save_patient(patient)
@@ -54,6 +55,7 @@ def test_invoice_marks_only_open_services(tmp_path, monkeypatch):
     record = storage.read_json(storage.invoices_dir / "Rechnung_260111.json")
     assert record["gesamt_cent"] == 2010
     assert [item["id"] for item in record["leistungen"]] == ["new"]
+    assert record["leistungen"][0]["notiz"] == "Hausbesuch"
 
 
 def test_pdf_is_created_with_unicode_text(tmp_path):
