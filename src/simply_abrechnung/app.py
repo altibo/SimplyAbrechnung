@@ -37,7 +37,7 @@ class ServiceDialog(tk.Toplevel):
     def __init__(self, parent: tk.Misc, catalog: list[dict], service: dict | None = None):
         super().__init__(parent)
         self.title("Leistung bearbeiten" if service else "Leistung eintragen")
-        self.resizable(True, False)
+        self.resizable(True, True)
         self.transient(parent)
         self.grab_set()
         self.result: dict | None = None
@@ -71,15 +71,24 @@ class ServiceDialog(tk.Toplevel):
         ttk.Label(frame, text="Anzahl").grid(row=2, column=0, sticky="w", pady=4)
         self.quantity_var = tk.IntVar(value=service.get("anzahl", 1) if service else 1)
         ttk.Spinbox(frame, from_=1, to=99, textvariable=self.quantity_var, width=8).grid(row=2, column=1, sticky="w", pady=4)
-        ttk.Label(frame, text="Zusatznotiz").grid(row=3, column=0, sticky="w", pady=4)
-        self.note_var = tk.StringVar(value=service.get("notiz", "") if service else "")
-        ttk.Entry(frame, textvariable=self.note_var, width=70).grid(row=3, column=1, sticky="ew", pady=4)
+        ttk.Label(frame, text="Zusatznotiz").grid(row=3, column=0, sticky="nw", pady=4)
+        note_frame = ttk.Frame(frame)
+        note_frame.grid(row=3, column=1, sticky="nsew", pady=4)
+        self.note_text = tk.Text(note_frame, width=70, height=10, wrap="word")
+        note_scroll = ttk.Scrollbar(note_frame, orient="vertical", command=self.note_text.yview)
+        self.note_text.configure(yscrollcommand=note_scroll.set)
+        self.note_text.grid(row=0, column=0, sticky="nsew")
+        note_scroll.grid(row=0, column=1, sticky="ns")
+        note_frame.columnconfigure(0, weight=1)
+        note_frame.rowconfigure(0, weight=1)
+        self.note_text.insert("1.0", service.get("notiz", "") if service else "")
         buttons = ttk.Frame(frame)
         buttons.grid(row=4, column=0, columnspan=2, sticky="e", pady=(14, 0))
         ttk.Button(buttons, text="Abbrechen", command=self.destroy).pack(side="left", padx=4)
         ttk.Button(buttons, text="Speichern" if service else "Eintragen", command=self.accept).pack(side="left", padx=4)
         frame.columnconfigure(1, weight=1)
-        self.bind("<Return>", lambda _event: self.accept())
+        frame.rowconfigure(3, weight=1)
+        self.bind("<Control-Return>", lambda _event: self.accept())
         self.wait_window()
 
     def accept(self) -> None:
@@ -103,7 +112,7 @@ class ServiceDialog(tk.Toplevel):
             "anzahl": quantity,
             "einzelbetrag_cent": int(item["betrag_cent"]),
             "gesamt_cent": int(item["betrag_cent"]) * quantity,
-            "notiz": self.note_var.get().strip(),
+            "notiz": self.note_text.get("1.0", "end").strip(),
             "rechnungsnummer": self.service.get("rechnungsnummer") if self.service else None,
             "rechnungsdatum": self.service.get("rechnungsdatum") if self.service else None,
             "eingetragen_am": self.service.get("eingetragen_am", datetime.now().isoformat(timespec="seconds")) if self.service else datetime.now().isoformat(timespec="seconds"),
@@ -334,8 +343,15 @@ class SimplyAbrechnungApp(tk.Tk):
         details.columnconfigure(3, weight=1)
         notes_row = (len(PATIENT_FIELDS) + 1) // 2
         ttk.Label(details, text="Freie Notizen").grid(row=notes_row, column=0, sticky="nw", pady=3)
-        self.notes = tk.Text(details, height=4, wrap="word")
-        self.notes.grid(row=notes_row, column=1, columnspan=3, sticky="ew", padx=(0, 14), pady=3)
+        notes_frame = ttk.Frame(details)
+        notes_frame.grid(row=notes_row, column=1, columnspan=3, sticky="nsew", padx=(0, 14), pady=3)
+        self.notes = tk.Text(notes_frame, height=6, wrap="word")
+        notes_scroll = ttk.Scrollbar(notes_frame, orient="vertical", command=self.notes.yview)
+        self.notes.configure(yscrollcommand=notes_scroll.set)
+        self.notes.grid(row=0, column=0, sticky="nsew")
+        notes_scroll.grid(row=0, column=1, sticky="ns")
+        notes_frame.columnconfigure(0, weight=1)
+        notes_frame.rowconfigure(0, weight=1)
 
         services_frame = ttk.LabelFrame(right, text="Behandlungen und Abrechnung", padding=10)
         services_frame.pack(fill="both", expand=True, pady=(8, 0))
@@ -348,13 +364,14 @@ class SimplyAbrechnungApp(tk.Tk):
         columns = ("datum", "nummer", "leistung", "notiz", "faktor", "anzahl", "betrag", "rechnung")
         self.service_tree = ttk.Treeview(services_frame, columns=columns, show="headings")
         settings = [
-            ("datum", "Datum", 85), ("nummer", "GOÄ-Nr.", 75), ("leistung", "Leistung", 380),
-            ("notiz", "Zusatznotiz", 180), ("faktor", "Faktor", 55), ("anzahl", "Anz.", 45),
-            ("betrag", "Betrag", 85), ("rechnung", "Rechnung", 90),
+            ("datum", "Datum", 75, 70, False), ("nummer", "GOÄ-Nr.", 65, 55, False),
+            ("leistung", "Leistung", 190, 140, True), ("notiz", "Zusatznotiz", 110, 80, True),
+            ("faktor", "Faktor", 52, 48, False), ("anzahl", "Anz.", 42, 38, False),
+            ("betrag", "Betrag", 75, 68, False), ("rechnung", "Rechnung", 80, 75, False),
         ]
-        for key, label, width in settings:
+        for key, label, width, min_width, stretch in settings:
             self.service_tree.heading(key, text=label)
-            self.service_tree.column(key, width=width, anchor="w")
+            self.service_tree.column(key, width=width, minwidth=min_width, stretch=stretch, anchor="w")
         scroll = ttk.Scrollbar(services_frame, orient="vertical", command=self.service_tree.yview)
         self.service_tree.configure(yscrollcommand=scroll.set)
         self.service_tree.bind("<Double-1>", lambda _event: self.edit_service())

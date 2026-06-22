@@ -2,7 +2,7 @@
 
 SimplyAbrechnung ist eine bewusst einfache, lokale Patientenkartei mit PDF-Rechnungen für eine kleine Privatpraxis. Die Anwendung benötigt keinen Server und keine Cloud.
 
-Aktuelle Programmversion: **0.2.0**
+Aktuelle Programmversion: **0.2.1**
 
 ## Funktionen
 
@@ -10,6 +10,7 @@ Aktuelle Programmversion: **0.2.0**
 - persönliche Daten, Diagnose, freie Notizen und datierte Behandlungen
 - Kennzeichnung als Privat- oder Kassenpatient
 - offene Leistungen per Doppelklick oder Schaltfläche bearbeiten, inklusive sichtbarer Zusatznotiz
+- scrollbare Langtextfelder für freie Notizen und Zusatznotizen zu Leistungen
 - zentraler, in der Anwendung bearbeitbarer GOÄ-Leistungskatalog
 - nur noch offene Positionen werden in die nächste Rechnung übernommen
 - automatische fortlaufende Rechnungsnummer
