@@ -2,6 +2,8 @@
 
 SimplyAbrechnung ist eine bewusst einfache, lokale Patientenkartei mit PDF-Rechnungen für eine kleine Privatpraxis. Die Anwendung benötigt keinen Server und keine Cloud.
 
+Website und Downloads: **https://altibo.github.io/SimplyAbrechnung/**
+
 Aktuelle Programmversion: **0.4.0**
 
 ## Funktionen
