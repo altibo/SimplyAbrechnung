@@ -1,0 +1,78 @@
+name: Anwendung bauen
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artifact: SimplyAbrechnung-Windows
+          - os: macos-latest
+            artifact: SimplyAbrechnung-macOS
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Quellcode laden
+        uses: actions/checkout@v4
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Abhängigkeiten installieren
+        run: python -m pip install -r requirements-dev.txt
+      - name: Tests ausführen
+        run: python -m pytest
+      - name: Anwendung bauen
+        run: pyinstaller --noconfirm --clean SimplyAbrechnung.spec
+      - name: Windows-Paket erstellen
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Compress-Archive -Path dist/SimplyAbrechnung.exe -DestinationPath dist/SimplyAbrechnung-Windows.zip
+      - name: macOS-Paket erstellen
+        if: runner.os == 'macOS'
+        run: ditto -c -k --sequesterRsrc --keepParent dist/SimplyAbrechnung.app dist/SimplyAbrechnung-macOS.zip
+      - name: Build-Artefakt bereitstellen
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: dist/${{ matrix.artifact }}.zip
+          if-no-files-found: error
+
+  release:
+    if: github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Quellcode laden
+        uses: actions/checkout@v4
+      - name: Build-Artefakte laden
+        uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
+      - name: Versionsnummer lesen
+        id: version
+        shell: bash
+        run: echo "version=$(sed -n 's/^version = \"\(.*\)\"/\1/p' pyproject.toml)" >> "$GITHUB_OUTPUT"
+      - name: GitHub-Vorabveröffentlichung erstellen
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        shell: bash
+        run: >-
+          gh release create "v${VERSION}-build.${GITHUB_RUN_NUMBER}"
+          release/SimplyAbrechnung-Windows.zip
+          release/SimplyAbrechnung-macOS.zip
+          --target "${GITHUB_SHA}"
+          --title "SimplyAbrechnung ${VERSION} · Build ${GITHUB_RUN_NUMBER}"
+          --notes "Automatisch getesteter Build für Windows und macOS. Programmversion: ${VERSION}."
+          --prerelease
