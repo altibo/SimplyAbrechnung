@@ -7,4 +7,5 @@ build/
 dist/
 *.spec.bak
 SimplyAbrechnung_Daten/
+aktuelles_logo.png
 .DS_Store

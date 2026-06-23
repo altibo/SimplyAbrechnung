@@ -4,11 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "simply-abrechnung"
-version = "0.4.0"
+version = "0.5.0"
 description = "Einfache lokale Patientenkartei und Rechnungsstellung fuer eine kleine Arztpraxis"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = ["reportlab>=4.2,<5"]
+dependencies = ["PySide6>=6.7,<7", "reportlab>=4.2,<5"]
 
 [project.scripts]
 simply-abrechnung = "simply_abrechnung.app:main"

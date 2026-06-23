@@ -1,16 +1,17 @@
 # SimplyAbrechnung
 
-SimplyAbrechnung ist eine bewusst einfache, lokale Patientenkartei mit PDF-Rechnungen für eine kleine Privatpraxis. Die Anwendung benötigt keinen Server und keine Cloud.
+SimplyAbrechnung ist eine bewusst einfache, lokale Patientenkartei mit PDF-Rechnungen für eine kleine Privatpraxis. Die Anwendung benötigt keinen Server und keine Cloud und nutzt eine moderne Qt-Oberfläche.
 
 Website und Downloads: **https://altibo.github.io/SimplyAbrechnung/**
 
-Aktuelle Programmversion: **0.4.0**
+Aktuelle Programmversion: **0.5.0**
 
 ## Funktionen
 
 - eine menschenlesbare JSON-Datei je Patient
 - persönliche Daten, Diagnose, freie Notizen und datierte Behandlungen
 - Kennzeichnung als Privat- oder Kassenpatient
+- moderne Qt-Oberfläche mit Kartenlayout, klaren Tabellen und skalierbaren Bereichen
 - offene Leistungen per Doppelklick oder Schaltfläche bearbeiten, inklusive sichtbarer Zusatznotiz
 - scrollbare Langtextfelder für freie Notizen und Zusatznotizen zu Leistungen
 - zentraler, in der Anwendung bearbeitbarer GOÄ-Leistungskatalog
@@ -20,7 +21,7 @@ Aktuelle Programmversion: **0.4.0**
 - Jahresübersicht mit Gesamt-, Bezahlt- und Offen-Summen
 - PDF-Zahlungserinnerungen für offene Rechnungen
 - aussagekräftige Rechnungsdateinamen mit Patient und Datum
-- PDF-Rechnung im Stil des mitgelieferten Vordrucks und mit dessen Original-Logo
+- PDF-Rechnung mit schlichtem Default-Logo, optionalem eigenem Praxislogo und einstellbarer Akzentfarbe
 - eigener JSON-Datensatz mit Zahlungshistorie zu jeder erstellten Rechnung
 - automatische Sicherungskopien vor Änderungen
 - sichtbare Versionsnummer in Fenstertitel und Symbolleiste
@@ -39,12 +40,15 @@ Die Anwendung speichert ihre Daten unter `SimplyAbrechnung_Daten` im Benutzerord
 SimplyAbrechnung_Daten/
 ├── praxis_config.json
 ├── goae_positionen.json
+├── praxis_logo.png        # optional, nur wenn ein eigenes Logo gewählt wurde
 ├── patienten/
 ├── rechnungen/
 └── sicherungen/
 ```
 
-Die Originalvorlagen bleiben unverändert im Ordner `Vorlage`.
+Unter **Praxis-Einstellungen** kann ein eigenes Logo ausgewählt werden. Die App kopiert es in den Datenordner und verwendet es ab dann für neue Rechnungen. Ohne eigenes Logo wird ein neutrales Default-Logo erzeugt. Die Akzentfarbe der Rechnung ist dort ebenfalls einstellbar.
+
+Das bisherige Vorlagen-Logo wird nicht mehr in die Installationspakete übernommen.
 
 ## Datenschutz und Datensicherung
 

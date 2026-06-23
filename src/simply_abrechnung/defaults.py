@@ -14,6 +14,8 @@ DEFAULT_CONFIG = {
         "iban": "DE63 7909 0000 0103 7272 97",
         "steuernummer": "",
         "zahlungsziel_tage": 14,
+        "logo_datei": "",
+        "akzentfarbe": "#0A4B92",
         "standard_begruendung": (
             "Überdurchschnittlicher Zeitaufwand sowie erhöhte Schwierigkeit "
             "aufgrund der individuellen medizinischen Situation."

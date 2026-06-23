@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 from simply_abrechnung.billing import (
     annual_totals,
@@ -33,6 +34,19 @@ def test_patient_is_human_readable_json(tmp_path):
     assert "\n  \"vorname\"" in content
     assert json.loads(content)["nachname"] == "Musterfrau"
     assert json.loads(content)["patiententyp"] == "Privatpatient"
+
+
+def test_existing_config_gets_logo_and_accent_defaults(tmp_path):
+    storage = Storage(tmp_path)
+    storage.initialize()
+    config = storage.load_config()
+    del config["praxis"]["logo_datei"]
+    del config["praxis"]["akzentfarbe"]
+    storage.save_config(config)
+
+    migrated = storage.load_config()
+    assert migrated["praxis"]["logo_datei"] == ""
+    assert migrated["praxis"]["akzentfarbe"] == "#0A4B92"
 
 
 def test_invoice_marks_only_open_services(tmp_path, monkeypatch):
@@ -122,3 +136,8 @@ def test_pdf_is_created_with_unicode_text(tmp_path):
     create_invoice_pdf(record, output)
     assert output.read_bytes().startswith(b"%PDF")
     assert output.stat().st_size > 10_000
+
+
+def test_packaged_app_does_not_include_old_template_logo():
+    spec = Path("SimplyAbrechnung.spec").read_text(encoding="utf-8")
+    assert '("Vorlage", "Vorlage")' not in spec

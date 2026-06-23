@@ -44,6 +44,15 @@ class Storage:
         self.config_path = self.root / "praxis_config.json"
         self.catalog_path = self.root / "goae_positionen.json"
 
+    @staticmethod
+    def _merge_defaults(default: Any, loaded: Any) -> Any:
+        if isinstance(default, dict) and isinstance(loaded, dict):
+            merged = deepcopy(default)
+            for key, value in loaded.items():
+                merged[key] = Storage._merge_defaults(default.get(key), value) if key in default else value
+            return merged
+        return loaded
+
     def initialize(self) -> None:
         for folder in (self.root, self.patients_dir, self.invoices_dir, self.backups_dir):
             folder.mkdir(parents=True, exist_ok=True)
@@ -75,7 +84,8 @@ class Storage:
         temporary.replace(path)
 
     def load_config(self) -> dict:
-        return self.read_json(self.config_path)
+        config = self.read_json(self.config_path)
+        return self._merge_defaults(DEFAULT_CONFIG, config)
 
     def save_config(self, config: dict) -> None:
         self.write_json(self.config_path, config)

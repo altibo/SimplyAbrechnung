@@ -13,7 +13,6 @@ a = Analysis(
     pathex=["src"],
     binaries=[],
     datas=[
-        ("Vorlage", "Vorlage"),
         (str(reportlab_fonts / "Vera.ttf"), "reportlab/fonts"),
         (str(reportlab_fonts / "VeraBd.ttf"), "reportlab/fonts"),
     ],

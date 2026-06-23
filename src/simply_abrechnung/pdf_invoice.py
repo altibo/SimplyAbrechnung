@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import io
-import zipfile
 from pathlib import Path
 
 import reportlab
@@ -13,28 +11,50 @@ from reportlab.pdfbase.pdfmetrics import stringWidth
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
 
-from .storage import resource_path
 from .utils import euro
 
 
 MM = 72 / 25.4
-BLUE = colors.HexColor("#0A4B92")
+DEFAULT_ACCENT = "#0A4B92"
 FONT_DIR = Path(reportlab.__file__).resolve().parent / "fonts"
 pdfmetrics.registerFont(TTFont("Vera", str(FONT_DIR / "Vera.ttf")))
 pdfmetrics.registerFont(TTFont("VeraBd", str(FONT_DIR / "VeraBd.ttf")))
 
 
-def _logo() -> ImageReader | None:
-    candidates = list((resource_path("Vorlage")).glob("*Rech*.docx"))
-    if not candidates:
-        candidates = list((resource_path("vorlage")).glob("*Rech*.docx"))
-    if not candidates:
-        return None
+def _accent_color(practice: dict) -> colors.Color:
+    value = str(practice.get("akzentfarbe") or DEFAULT_ACCENT).strip()
     try:
-        with zipfile.ZipFile(candidates[0]) as archive:
-            return ImageReader(io.BytesIO(archive.read("word/media/image1.png")))
-    except (OSError, KeyError, zipfile.BadZipFile):
+        return colors.HexColor(value)
+    except ValueError:
+        return colors.HexColor(DEFAULT_ACCENT)
+
+
+def _logo(practice: dict, data_dir: Path | None) -> ImageReader | None:
+    filename = str(practice.get("logo_datei") or "").strip()
+    if not filename or not data_dir:
         return None
+    path = (data_dir / filename).resolve()
+    try:
+        if not path.is_file() or data_dir.resolve() not in path.parents:
+            return None
+        return ImageReader(str(path))
+    except OSError:
+        return None
+
+
+def _draw_default_logo(c: canvas.Canvas, x: float, y: float, width: float, height: float, accent: colors.Color) -> None:
+    c.saveState()
+    c.setStrokeColor(accent)
+    c.setFillColor(colors.white)
+    c.setLineWidth(1.4)
+    size = min(width, height)
+    c.roundRect(x + (width - size) / 2, y + (height - size) / 2, size, size, 5 * MM, stroke=1, fill=0)
+    c.setFillColor(accent)
+    c.setFont("VeraBd", 17)
+    c.drawCentredString(x + width / 2, y + height / 2 - 4, "SA")
+    c.setFont("Vera", 5.8)
+    c.drawCentredString(x + width / 2, y + height / 2 - 13, "SimplyAbrechnung")
+    c.restoreState()
 
 
 def _draw_wrapped(c: canvas.Canvas, text: str, x: float, y: float, width: float, font: str, size: float, leading: float) -> float:
@@ -64,7 +84,8 @@ def _wrap_lines(text: str, width: float, font: str, size: float) -> list[str]:
 
 def _header(c: canvas.Canvas, practice: dict, page: int, logo: ImageReader | None, title: str = "Privatrechnung (GOÄ)") -> float:
     width, height = A4
-    c.setFillColor(BLUE)
+    accent = _accent_color(practice)
+    c.setFillColor(accent)
     c.setFont("VeraBd", 11)
     c.drawString(20 * MM, height - 19 * MM, f"{title} · {practice.get('arzt', '')}")
     c.setFillColor(colors.black)
@@ -76,17 +97,19 @@ def _header(c: canvas.Canvas, practice: dict, page: int, logo: ImageReader | Non
         y -= 4 * MM
     if logo:
         c.drawImage(logo, width - 53 * MM, height - 52 * MM, width=36 * MM, height=36 * MM, preserveAspectRatio=True, mask="auto")
+    else:
+        _draw_default_logo(c, width - 53 * MM, height - 52 * MM, 36 * MM, 36 * MM, accent)
     if page > 1:
         c.setFont("Vera", 8)
         c.drawRightString(width - 20 * MM, height - 53 * MM, f"Seite {page}")
     return height - 56 * MM
 
 
-def _table_header(c: canvas.Canvas, y: float) -> float:
+def _table_header(c: canvas.Canvas, y: float, accent: colors.Color) -> float:
     x = 20 * MM
     widths = [21 * MM, 18 * MM, 79 * MM, 15 * MM, 13 * MM, 24 * MM]
     labels = ["Datum", "GOÄ-Nr.", "Leistung", "Faktor", "Anz.", "Betrag"]
-    c.setFillColor(BLUE)
+    c.setFillColor(accent)
     c.rect(x, y - 7 * MM, sum(widths), 7 * MM, fill=1, stroke=0)
     c.setFillColor(colors.white)
     c.setFont("VeraBd", 8)
@@ -97,14 +120,14 @@ def _table_header(c: canvas.Canvas, y: float) -> float:
     return y - 7 * MM
 
 
-def _service_row(c: canvas.Canvas, service: dict, y: float, shade: bool) -> float:
+def _service_row(c: canvas.Canvas, service: dict, y: float, shade: bool, accent: colors.Color) -> float:
     x = 20 * MM
     widths = [21 * MM, 18 * MM, 79 * MM, 15 * MM, 13 * MM, 24 * MM]
     desc = service.get("text", "")
     lines = _wrap_lines(desc, widths[2] - 3 * MM, "Vera", 8)
     row_height = max(7 * MM, (len(lines) * 3.7 + 3) * MM)
     if shade:
-        c.setFillColor(colors.HexColor("#EDF3FA"))
+        c.setFillColor(colors.Color(max(0.0, accent.red + (1.0 - accent.red) * 0.9), max(0.0, accent.green + (1.0 - accent.green) * 0.9), max(0.0, accent.blue + (1.0 - accent.blue) * 0.9)))
         c.rect(x, y - row_height, sum(widths), row_height, fill=1, stroke=0)
     c.setFillColor(colors.black)
     c.setFont("Vera", 8)
@@ -132,9 +155,11 @@ def create_invoice_pdf(record: dict, output: Path) -> None:
     c = canvas.Canvas(str(output), pagesize=A4, pageCompression=1)
     c.setTitle(f"Rechnung {record['rechnungsnummer']}")
     c.setAuthor(record["praxis"].get("arzt", ""))
-    logo = _logo()
     patient = record["patient"]
     practice = record["praxis"]
+    data_dir = output.parent.parent if output.parent.name == "rechnungen" else output.parent
+    logo = _logo(practice, data_dir)
+    accent = _accent_color(practice)
     width, height = A4
     page = 1
     y = _header(c, practice, page, logo)
@@ -168,7 +193,7 @@ def create_invoice_pdf(record: dict, output: Path) -> None:
     c.setFont("Vera", 9)
     c.drawString(20 * MM, y, "Für meine ärztlichen Leistungen erlaube ich mir zu berechnen:")
     y -= 7 * MM
-    y = _table_header(c, y)
+    y = _table_header(c, y, accent)
     for index, service in enumerate(record["leistungen"]):
         expected_lines = len(_wrap_lines(service.get("text", ""), 76 * MM, "Vera", 8))
         expected_height = max(7 * MM, (expected_lines * 3.7 + 3) * MM)
@@ -176,11 +201,11 @@ def create_invoice_pdf(record: dict, output: Path) -> None:
             c.showPage()
             page += 1
             y = _header(c, practice, page, logo)
-            y = _table_header(c, y)
-        y = _service_row(c, service, y, index % 2 == 1)
+            y = _table_header(c, y, accent)
+        y = _service_row(c, service, y, index % 2 == 1, accent)
 
     y -= 5 * MM
-    c.setFillColor(BLUE)
+    c.setFillColor(accent)
     c.setFont("VeraBd", 12)
     c.drawRightString(width - 20 * MM, y, f"Gesamt: {euro(record['gesamt_cent'])}")
     c.setFillColor(colors.black)
@@ -222,7 +247,8 @@ def create_payment_reminder_pdf(record: dict, output: Path, reminder_date: str) 
     patient = record["patient"]
     practice = record["praxis"]
     width, _height = A4
-    y = _header(c, practice, 1, _logo(), "Zahlungserinnerung")
+    data_dir = output.parent.parent if output.parent.name == "rechnungen" else output.parent
+    y = _header(c, practice, 1, _logo(practice, data_dir), "Zahlungserinnerung")
 
     sender = f"{practice.get('arzt', '')} · {practice.get('strasse', '')} · {practice.get('plz_ort', '')}"
     c.setFont("Vera", 6.5)
