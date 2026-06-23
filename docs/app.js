@@ -1,7 +1,9 @@
 const repository = "altibo/SimplyAbrechnung";
 const requiredAssets = {
   windows: "SimplyAbrechnung-Windows-Setup.exe",
+  windowsZip: "SimplyAbrechnung-Windows.zip",
   mac: "SimplyAbrechnung-macOS.pkg",
+  macZip: "SimplyAbrechnung-macOS.zip",
 };
 
 const formatSize = (bytes) => `${(bytes / 1024 / 1024).toFixed(1).replace(".", ",")} MB`;
@@ -9,8 +11,10 @@ const formatSize = (bytes) => `${(bytes / 1024 / 1024).toFixed(1).replace(".", "
 const applyRelease = (release) => {
   const assets = new Map(release.assets.map((asset) => [asset.name, asset]));
   const windows = assets.get(requiredAssets.windows);
+  const windowsZip = assets.get(requiredAssets.windowsZip);
   const mac = assets.get(requiredAssets.mac);
-  if (!windows || !mac) return false;
+  const macZip = assets.get(requiredAssets.macZip);
+  if (!windows || !windowsZip || !mac || !macZip) return false;
 
   const versionMatch = release.tag_name.match(/^v([^\-]+)(?:-|$)/);
   const version = versionMatch ? versionMatch[1] : release.tag_name.replace(/^v/, "");
@@ -21,9 +25,13 @@ const applyRelease = (release) => {
   document.querySelector("#release-meta").textContent = `${release.name} · veröffentlicht am ${date}`;
   document.querySelector("#release-link").href = release.html_url;
   document.querySelector("#windows-download").href = windows.browser_download_url;
+  document.querySelector("#windows-zip-download").href = windowsZip.browser_download_url;
   document.querySelector("#mac-download").href = mac.browser_download_url;
+  document.querySelector("#mac-zip-download").href = macZip.browser_download_url;
   document.querySelector("#windows-meta").textContent = `Setup · ${formatSize(windows.size)} · Windows 10/11`;
+  document.querySelector("#windows-zip-meta").textContent = `ZIP · ${formatSize(windowsZip.size)} · portable`;
   document.querySelector("#mac-meta").textContent = `Installationspaket · ${formatSize(mac.size)}`;
+  document.querySelector("#mac-zip-meta").textContent = `ZIP · ${formatSize(macZip.size)} · App-Bundle`;
   return true;
 };
 

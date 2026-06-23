@@ -16,10 +16,14 @@ jobs:
         include:
           - os: windows-latest
             artifact: SimplyAbrechnung-Windows
-            package: dist/SimplyAbrechnung-Windows-Setup.exe
+            packages: |
+              dist/SimplyAbrechnung-Windows-Setup.exe
+              dist/SimplyAbrechnung-Windows.zip
           - os: macos-latest
             artifact: SimplyAbrechnung-macOS
-            package: dist/SimplyAbrechnung-macOS.pkg
+            packages: |
+              dist/SimplyAbrechnung-macOS.pkg
+              dist/SimplyAbrechnung-macOS.zip
     runs-on: ${{ matrix.os }}
     steps:
       - name: Quellcode laden
@@ -35,6 +39,10 @@ jobs:
         run: python -m pytest
       - name: Anwendung bauen
         run: pyinstaller --noconfirm --clean SimplyAbrechnung.spec
+      - name: Windows-ZIP erstellen
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Compress-Archive -Path dist/SimplyAbrechnung.exe -DestinationPath dist/SimplyAbrechnung-Windows.zip -Force
       - name: Inno Setup installieren
         if: runner.os == 'Windows'
         shell: pwsh
@@ -57,11 +65,15 @@ jobs:
             --install-location /Applications \
             dist/SimplyAbrechnung-macOS.pkg
           pkgutil --payload-files dist/SimplyAbrechnung-macOS.pkg | grep -q 'SimplyAbrechnung.app'
+      - name: macOS-ZIP erstellen
+        if: runner.os == 'macOS'
+        shell: bash
+        run: ditto -c -k --keepParent dist/SimplyAbrechnung.app dist/SimplyAbrechnung-macOS.zip
       - name: Build-Artefakt bereitstellen
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
-          path: ${{ matrix.package }}
+          path: ${{ matrix.packages }}
           if-no-files-found: error
 
   release:
@@ -88,8 +100,10 @@ jobs:
         run: >-
           gh release create "v${VERSION}-build.${GITHUB_RUN_NUMBER}"
           release/SimplyAbrechnung-Windows-Setup.exe
+          release/SimplyAbrechnung-Windows.zip
           release/SimplyAbrechnung-macOS.pkg
+          release/SimplyAbrechnung-macOS.zip
           --target "${GITHUB_SHA}"
           --title "SimplyAbrechnung ${VERSION} · Build ${GITHUB_RUN_NUMBER}"
-          --notes "Installationspakete mit Upgrade-Unterstützung für Windows und macOS. Programmversion: ${VERSION}."
+          --notes "Installationspakete mit Upgrade-Unterstützung und ZIP-Pakete für Windows und macOS. Programmversion: ${VERSION}."
           --prerelease

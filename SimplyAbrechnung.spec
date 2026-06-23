@@ -7,12 +7,15 @@ import reportlab
 
 
 reportlab_fonts = Path(reportlab.__file__).resolve().parent / "fonts"
+app_icon_ico = Path("assets/icons/app_icon.ico").resolve()
+app_icon_icns = Path("assets/icons/app_icon.icns").resolve()
 
 a = Analysis(
     ["run_simply_abrechnung.py"],
     pathex=["src"],
     binaries=[],
     datas=[
+        ("assets/icons/app_icon.png", "assets/icons"),
         (str(reportlab_fonts / "Vera.ttf"), "reportlab/fonts"),
         (str(reportlab_fonts / "VeraBd.ttf"), "reportlab/fonts"),
     ],
@@ -36,12 +39,12 @@ if sys.platform == "darwin":
         name="SimplyAbrechnung",
     )
     app = BUNDLE(
-        collected, name="SimplyAbrechnung.app", icon=None,
+        collected, name="SimplyAbrechnung.app", icon=str(app_icon_icns),
         bundle_identifier="de.altibo.simplyabrechnung",
     )
 else:
     exe = EXE(
         pyz, a.scripts, a.binaries, a.datas, [],
         name="SimplyAbrechnung", debug=False, bootloader_ignore_signals=False,
-        strip=False, upx=True, console=False,
+        strip=False, upx=True, console=False, icon=str(app_icon_ico),
     )

@@ -5,11 +5,11 @@ import shutil
 import subprocess
 import sys
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor, QPalette
+from PySide6.QtGui import QColor, QPalette, QBrush, QIcon
 from PySide6.QtWidgets import (
     QApplication,
     QAbstractItemView,
@@ -48,7 +48,7 @@ from .billing import (
     set_invoice_payment,
     unbilled_services,
 )
-from .storage import Storage
+from .storage import Storage, resource_path
 from .utils import euro, parse_euro, today_german, validate_date
 
 
@@ -58,6 +58,40 @@ PATIENT_FIELDS = [
     ("ort", "Ort"), ("telefon", "Telefon"), ("email", "E-Mail"),
     ("patiententyp", "Patiententyp"), ("diagnose", "Diagnose"),
 ]
+
+
+TEXT_COLOR = "#18324A"
+MUTED_TEXT_COLOR = "#40566D"
+ACCENT_COLOR = "#0A4B92"
+ACCENT_HOVER_COLOR = "#1265BD"
+WINDOW_COLOR = "#F4F7FB"
+CARD_COLOR = "#FFFFFF"
+FIELD_BORDER_COLOR = "#D8E0EA"
+HEADER_COLOR = "#EAF1F8"
+SELECTION_COLOR = "#D7E9FF"
+PAID_ROW_COLOR = "#E8F7EC"
+OPEN_ROW_COLOR = "#FFF8D8"
+REMINDER_ROW_COLOR = "#FFE8CC"
+APP_ICON_PATH = "assets/icons/app_icon.png"
+
+
+def configure_application_theme(app: QApplication) -> None:
+    palette = app.palette()
+    palette.setColor(QPalette.ColorRole.Window, QColor(WINDOW_COLOR))
+    palette.setColor(QPalette.ColorRole.WindowText, QColor(TEXT_COLOR))
+    palette.setColor(QPalette.ColorRole.Base, QColor(CARD_COLOR))
+    palette.setColor(QPalette.ColorRole.AlternateBase, QColor("#F8FBFF"))
+    palette.setColor(QPalette.ColorRole.Text, QColor(TEXT_COLOR))
+    palette.setColor(QPalette.ColorRole.Button, QColor(ACCENT_COLOR))
+    palette.setColor(QPalette.ColorRole.ButtonText, QColor("#FFFFFF"))
+    palette.setColor(QPalette.ColorRole.Highlight, QColor(ACCENT_COLOR))
+    palette.setColor(QPalette.ColorRole.HighlightedText, QColor("#FFFFFF"))
+    palette.setColor(QPalette.ColorRole.PlaceholderText, QColor("#6B7C8F"))
+    app.setPalette(palette)
+
+
+def app_icon() -> QIcon:
+    return QIcon(str(resource_path(APP_ICON_PATH)))
 
 
 def open_path(path: Path) -> None:
@@ -76,6 +110,31 @@ def ask_error(parent: QWidget, title: str, text: str) -> None:
 def selected_row(table: QTableWidget) -> int:
     rows = table.selectionModel().selectedRows()
     return rows[0].row() if rows else -1
+
+
+def patient_age(patient: dict, today: date | None = None) -> str:
+    birthdate = str(patient.get("geburtsdatum", "")).strip()
+    if not birthdate:
+        return ""
+    today = today or date.today()
+    try:
+        born = datetime.strptime(birthdate, "%d.%m.%Y").date()
+    except ValueError:
+        return ""
+    age = today.year - born.year - ((today.month, today.day) < (born.month, born.day))
+    return str(age) if age >= 0 else ""
+
+
+def unbilled_total(patient: dict) -> int:
+    return sum(int(service.get("gesamt_cent", 0)) for service in unbilled_services(patient))
+
+
+def invoice_status_color(record: dict) -> QColor:
+    if invoice_payment_status(record) == "bezahlt":
+        return QColor(PAID_ROW_COLOR)
+    if record.get("zahlungserinnerungen"):
+        return QColor(REMINDER_ROW_COLOR)
+    return QColor(OPEN_ROW_COLOR)
 
 
 class ServiceDialog(QDialog):
@@ -158,6 +217,79 @@ class ServiceDialog(QDialog):
             "rechnungsdatum": self.service.get("rechnungsdatum"),
             "eingetragen_am": self.service.get("eingetragen_am", datetime.now().isoformat(timespec="seconds")),
         }
+        self.accept()
+
+
+class ServiceDetailsDialog(QDialog):
+    def __init__(self, parent: QWidget, service: dict):
+        super().__init__(parent)
+        self.setWindowTitle("Abgerechnete Leistung ansehen")
+        self.setModal(True)
+        self.resize(760, 430)
+
+        layout = QVBoxLayout(self)
+        form = QFormLayout()
+        details = [
+            ("Datum", service.get("datum", "")),
+            ("GOÄ-Nr.", service.get("nummer", "")),
+            ("Leistung", service.get("text", "")),
+            ("Faktor", service.get("faktor", "")),
+            ("Anzahl", service.get("anzahl", 1)),
+            ("Betrag", euro(int(service.get("gesamt_cent", 0)))),
+            ("Rechnung", service.get("rechnungsnummer", "")),
+            ("Rechnungsdatum", service.get("rechnungsdatum", "")),
+        ]
+        for label, value in details:
+            field = QLineEdit(str(value))
+            field.setReadOnly(True)
+            form.addRow(label, field)
+
+        self.note = QTextEdit()
+        self.note.setMinimumHeight(150)
+        self.note.setReadOnly(True)
+        self.note.setPlainText(service.get("notiz", ""))
+        form.addRow("Zusatznotiz", self.note)
+        layout.addLayout(form)
+
+        hint = QLabel("Diese Leistung ist bereits abgerechnet und deshalb schreibgeschützt.")
+        hint.setObjectName("muted")
+        layout.addWidget(hint)
+
+        buttons = QHBoxLayout()
+        buttons.addStretch(1)
+        close = QPushButton("Schließen")
+        close.clicked.connect(self.accept)
+        buttons.addWidget(close)
+        layout.addLayout(buttons)
+
+
+class FreeNotesDialog(QDialog):
+    def __init__(self, parent: QWidget, text: str):
+        super().__init__(parent)
+        self.setWindowTitle("Freie Notizen")
+        self.setModal(True)
+        self.resize(820, 620)
+        self.result: str | None = None
+
+        layout = QVBoxLayout(self)
+        self.editor = QTextEdit()
+        line_height = self.editor.fontMetrics().lineSpacing()
+        self.editor.setMinimumHeight(line_height * 20 + 28)
+        self.editor.setPlainText(text)
+        layout.addWidget(self.editor)
+
+        buttons = QHBoxLayout()
+        buttons.addStretch(1)
+        cancel = QPushButton("Abbrechen")
+        save = QPushButton("Übernehmen")
+        cancel.clicked.connect(self.reject)
+        save.clicked.connect(self.accept_values)
+        buttons.addWidget(cancel)
+        buttons.addWidget(save)
+        layout.addLayout(buttons)
+
+    def accept_values(self) -> None:
+        self.result = self.editor.toPlainText().strip()
         self.accept()
 
 
@@ -411,7 +543,10 @@ class InvoiceOverviewDialog(QDialog):
 
         self.table = QTableWidget(0, 7)
         self.table.setHorizontalHeaderLabels(["Rechnung", "Datum", "Patient", "Betrag", "Status", "Bezahlt am", "Letzte Erinnerung"])
-        self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        invoice_header = self.table.horizontalHeader()
+        invoice_header.setSectionResizeMode(2, QHeaderView.ResizeMode.Interactive)
+        invoice_header.resizeSection(2, 170)
+        invoice_header.setSectionResizeMode(6, QHeaderView.ResizeMode.Stretch)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.doubleClicked.connect(self.open_invoice)
@@ -461,8 +596,11 @@ class InvoiceOverviewDialog(QDialog):
                 euro(int(record.get("gesamt_cent", 0))), invoice_payment_status(record),
                 record.get("bezahlt_am") or "", reminder_date,
             ]
+            row_brush = QBrush(invoice_status_color(record))
             for col, value in enumerate(values):
-                self.table.setItem(row, col, QTableWidgetItem(str(value)))
+                item = QTableWidgetItem(str(value))
+                item.setBackground(row_brush)
+                self.table.setItem(row, col, item)
         if year == "Alle Jahre":
             total = sum(int(record.get("gesamt_cent", 0)) for record in year_records)
             paid = sum(int(record.get("gesamt_cent", 0)) for record in year_records if invoice_payment_status(record) == "bezahlt")
@@ -538,12 +676,15 @@ class InvoiceOverviewDialog(QDialog):
 class SimplyAbrechnungApp(QMainWindow):
     def __init__(self, storage: Storage | None = None):
         super().__init__()
+        if QApplication.instance():
+            configure_application_theme(QApplication.instance())
         self.storage = storage or Storage()
         self.storage.initialize()
         self.current: dict | None = None
         self.patients: list[dict] = []
         self.service_rows: list[dict] = []
         self.setWindowTitle(f"SimplyAbrechnung {__version__}")
+        self.setWindowIcon(app_icon())
         self.resize(1240, 780)
         self.setMinimumSize(980, 660)
         self.build_ui()
@@ -563,9 +704,6 @@ class SimplyAbrechnungApp(QMainWindow):
         ]:
             action = toolbar.addAction(label)
             action.triggered.connect(lambda _checked=False, cb=callback: cb())
-        self.version_label = QLabel(f"  Version {__version__}")
-        toolbar.addWidget(self.version_label)
-
         central = QWidget()
         self.setCentralWidget(central)
         outer = QVBoxLayout(central)
@@ -581,9 +719,11 @@ class SimplyAbrechnungApp(QMainWindow):
         self.search.setPlaceholderText("Suchen…")
         self.search.textChanged.connect(self.refresh_patient_list)
         left_layout.addWidget(self.search)
-        self.patient_table = QTableWidget(0, 2)
-        self.patient_table.setHorizontalHeaderLabels(["Name", "Geburtsdatum"])
+        self.patient_table = QTableWidget(0, 3)
+        self.patient_table.setHorizontalHeaderLabels(["Name", "Alter", "Offen"])
         self.patient_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        self.patient_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        self.patient_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
         self.patient_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.patient_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.patient_table.itemSelectionChanged.connect(self.on_patient_selected)
@@ -610,8 +750,13 @@ class SimplyAbrechnungApp(QMainWindow):
         notes_row = 1 + (len(PATIENT_FIELDS) + 1) // 2
         details_layout.addWidget(QLabel("Freie Notizen"), notes_row, 0, alignment=Qt.AlignmentFlag.AlignTop)
         self.notes = QTextEdit()
-        self.notes.setMinimumHeight(150)
-        self.notes.setPlaceholderText("Freie Notizen zur Karteikarte")
+        notes_line_height = self.notes.fontMetrics().lineSpacing()
+        self.notes.setMinimumHeight(notes_line_height * 3 + 24)
+        self.notes.setMaximumHeight(notes_line_height * 3 + 32)
+        self.notes.setReadOnly(True)
+        self.notes.setPlaceholderText("Zum Bearbeiten hier klicken…")
+        self.notes.setToolTip("Klicken, um freie Notizen groß zu öffnen")
+        self.notes.mousePressEvent = lambda event: self.open_free_notes()  # type: ignore[method-assign]
         details_layout.addWidget(self.notes, notes_row, 1, 1, 3)
         right_layout.addWidget(details)
 
@@ -653,17 +798,47 @@ class SimplyAbrechnungApp(QMainWindow):
         self.apply_style()
 
     def apply_style(self) -> None:
-        self.setStyleSheet("""
-            QMainWindow { background: #F4F7FB; }
-            QToolBar { background: #FFFFFF; border: 0; padding: 8px; spacing: 8px; }
-            QToolButton, QPushButton { background: #0A4B92; color: white; border: 0; border-radius: 8px; padding: 8px 12px; }
-            QPushButton:hover, QToolButton:hover { background: #1265BD; }
-            QLineEdit, QComboBox, QTextEdit, QTableWidget { background: white; border: 1px solid #D8E0EA; border-radius: 8px; padding: 5px; }
-            QHeaderView::section { background: #EAF1F8; color: #18324A; border: 0; padding: 7px; font-weight: 600; }
-            QTableWidget { gridline-color: #EEF2F6; selection-background-color: #D7E9FF; selection-color: #102A43; }
-            QFrame#card { background: white; border: 1px solid #E0E7EF; border-radius: 14px; padding: 8px; }
-            QLabel#sectionTitle { font-size: 18px; font-weight: 700; color: #18324A; }
-            QLabel#status { background: #FFFFFF; border-top: 1px solid #D8E0EA; padding: 6px; color: #40566D; }
+        self.setStyleSheet(f"""
+            QWidget {{ color: {TEXT_COLOR}; }}
+            QMainWindow {{ background: {WINDOW_COLOR}; color: {TEXT_COLOR}; }}
+            QToolBar {{ background: {CARD_COLOR}; border: 0; padding: 8px; spacing: 8px; color: {TEXT_COLOR}; }}
+            QToolButton, QPushButton {{ background: {ACCENT_COLOR}; color: #FFFFFF; border: 0; border-radius: 8px; padding: 8px 12px; }}
+            QPushButton:hover, QToolButton:hover {{ background: {ACCENT_HOVER_COLOR}; color: #FFFFFF; }}
+            QPushButton:pressed, QToolButton:pressed {{ background: #083D78; color: #FFFFFF; }}
+            QPushButton:disabled, QToolButton:disabled {{ background: #CAD5E0; color: #627386; }}
+            QLabel {{ color: {TEXT_COLOR}; background: transparent; }}
+            QLineEdit, QComboBox, QTextEdit, QPlainTextEdit {{
+                background: {CARD_COLOR};
+                color: {TEXT_COLOR};
+                border: 1px solid {FIELD_BORDER_COLOR};
+                border-radius: 8px;
+                padding: 5px;
+                selection-background-color: {SELECTION_COLOR};
+                selection-color: #102A43;
+            }}
+            QComboBox QAbstractItemView {{
+                background: {CARD_COLOR};
+                color: {TEXT_COLOR};
+                selection-background-color: {SELECTION_COLOR};
+                selection-color: #102A43;
+            }}
+            QTableWidget {{
+                background: {CARD_COLOR};
+                color: {TEXT_COLOR};
+                border: 1px solid {FIELD_BORDER_COLOR};
+                border-radius: 8px;
+                padding: 5px;
+                gridline-color: #EEF2F6;
+                selection-background-color: {SELECTION_COLOR};
+                selection-color: #102A43;
+            }}
+            QTableWidget::item {{ color: {TEXT_COLOR}; }}
+            QTableWidget::item:selected {{ background: {SELECTION_COLOR}; color: #102A43; }}
+            QHeaderView::section {{ background: {HEADER_COLOR}; color: {TEXT_COLOR}; border: 0; padding: 7px; font-weight: 600; }}
+            QFrame#card {{ background: {CARD_COLOR}; border: 1px solid #E0E7EF; border-radius: 14px; padding: 8px; color: {TEXT_COLOR}; }}
+            QLabel#sectionTitle {{ font-size: 18px; font-weight: 700; color: {TEXT_COLOR}; }}
+            QLabel#muted {{ color: {MUTED_TEXT_COLOR}; }}
+            QLabel#status {{ background: {CARD_COLOR}; border-top: 1px solid {FIELD_BORDER_COLOR}; padding: 6px; color: {MUTED_TEXT_COLOR}; }}
         """)
 
     def refresh_patient_list(self, select_id: str | None = None) -> None:
@@ -679,7 +854,8 @@ class SimplyAbrechnungApp(QMainWindow):
         for row, patient in enumerate(self.patients):
             name = f"{patient.get('nachname', '')}, {patient.get('vorname', '')}".strip(", ")
             self.patient_table.setItem(row, 0, QTableWidgetItem(name))
-            self.patient_table.setItem(row, 1, QTableWidgetItem(patient.get("geburtsdatum", "")))
+            self.patient_table.setItem(row, 1, QTableWidgetItem(patient_age(patient)))
+            self.patient_table.setItem(row, 2, QTableWidgetItem(euro(unbilled_total(patient))))
             if select_id and patient["id"] == select_id:
                 self.patient_table.selectRow(row)
         self.patient_table.blockSignals(False)
@@ -707,6 +883,14 @@ class SimplyAbrechnungApp(QMainWindow):
                 widget.setText(value)
         self.notes.setPlainText(self.current.get("notizen", ""))
         self.refresh_services()
+
+    def open_free_notes(self) -> None:
+        if not self.current:
+            QMessageBox.information(self, "Patient wählen", "Bitte zuerst einen Patienten auswählen oder neu anlegen.")
+            return
+        dialog = FreeNotesDialog(self, self.notes.toPlainText())
+        if dialog.exec() and dialog.result is not None:
+            self.notes.setPlainText(dialog.result)
 
     def collect_form(self) -> None:
         if not self.current:
@@ -778,7 +962,7 @@ class SimplyAbrechnungApp(QMainWindow):
         if not service:
             return
         if service.get("rechnungsnummer"):
-            ask_error(self, "Nicht bearbeitbar", "Bereits abgerechnete Leistungen bleiben unverändert. Bitte gegebenenfalls stornieren und neu abrechnen.")
+            ServiceDetailsDialog(self, service).exec()
             return
         dialog = ServiceDialog(self, self.storage.load_catalog(), service)
         if dialog.exec() and dialog.result:
@@ -843,9 +1027,8 @@ def main() -> None:
     app.setApplicationName("SimplyAbrechnung")
     app.setOrganizationName("altibo")
     app.setStyle("Fusion")
-    palette = app.palette()
-    palette.setColor(QPalette.ColorRole.Highlight, QColor("#0A4B92"))
-    app.setPalette(palette)
+    configure_application_theme(app)
+    app.setWindowIcon(app_icon())
     window = SimplyAbrechnungApp()
     window.show()
     sys.exit(app.exec())

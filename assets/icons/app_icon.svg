@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="SimplyAbrechnung Logo">
+  <defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0A4B92"/><stop offset="1" stop-color="#083D78"/></linearGradient></defs>
+  <rect width="1024" height="1024" rx="225" fill="url(#bg)"/>
+  <rect x="268" y="160" width="524" height="695" rx="58" fill="#000" opacity=".18"/>
+  <path d="M250 140h400l124 124v571H250z" fill="#F7FBFF"/>
+  <path d="M650 140v124h124z" fill="#DAE8F7"/>
+  <path d="M315 370h330M315 454h395M315 538h280" stroke="#A4B9D0" stroke-width="24" stroke-linecap="round"/>
+  <path d="M370 655l92 89 188-186" fill="none" stroke="#3DA963" stroke-width="58" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="512" y="815" text-anchor="middle" font-family="Arial, sans-serif" font-weight="700" font-size="205" fill="#083D78" stroke="#fff" stroke-width="10" paint-order="stroke">SA</text>
+</svg>

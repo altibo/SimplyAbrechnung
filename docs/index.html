@@ -6,6 +6,8 @@
   <meta name="description" content="SimplyAbrechnung – lokale Patientenkartei und unkomplizierte Praxisabrechnung für Windows und macOS.">
   <meta name="theme-color" content="#0a4b92">
   <title>SimplyAbrechnung – Download</title>
+  <link rel="icon" type="image/png" href="app_icon.png">
+  <link rel="apple-touch-icon" href="app_icon.png">
   <link rel="stylesheet" href="styles.css">
   <script src="app.js" defer></script>
 </head>
@@ -14,12 +16,7 @@
     <section class="hero" aria-labelledby="title">
       <div class="intro">
         <a class="brand" href="./" aria-label="SimplyAbrechnung Startseite">
-          <span class="brand-mark" aria-hidden="true">
-            <svg viewBox="0 0 48 48" role="img">
-              <path d="M14 7h17l7 7v27H14z"/>
-              <path d="M31 7v8h7M20 23h12M20 29h12M20 35h8"/>
-            </svg>
-          </span>
+          <img class="brand-mark" src="app_icon.png" alt="" width="42" height="42">
           <span>SimplyAbrechnung</span>
         </a>
 
@@ -42,17 +39,27 @@
           <span id="version-label">Version 0.4.0</span>
         </div>
         <h2 id="download-title">SimplyAbrechnung herunterladen</h2>
-        <p class="card-copy">Installiere die aktuelle Version. Spätere Updates ersetzen die vorhandene Installation automatisch.</p>
+        <p class="card-copy">Installiere die aktuelle Version oder lade die portable ZIP-Datei herunter. Installer ersetzen vorhandene Installationen automatisch.</p>
 
         <div class="downloads">
           <a id="windows-download" class="download-button primary" href="https://github.com/altibo/SimplyAbrechnung/releases/download/v0.4.0-build.5/SimplyAbrechnung-Windows-Setup.exe">
             <span class="platform-icon" aria-hidden="true">⊞</span>
-            <span><strong>Für Windows</strong><small id="windows-meta">Setup · Windows 10/11</small></span>
+            <span><strong>Windows Installer</strong><small id="windows-meta">Setup · Windows 10/11</small></span>
+            <span class="arrow" aria-hidden="true">↓</span>
+          </a>
+          <a id="windows-zip-download" class="download-button secondary" href="https://github.com/altibo/SimplyAbrechnung/releases">
+            <span class="platform-icon" aria-hidden="true">⊞</span>
+            <span><strong>Windows ZIP</strong><small id="windows-zip-meta">Portable ZIP-Datei</small></span>
             <span class="arrow" aria-hidden="true">↓</span>
           </a>
           <a id="mac-download" class="download-button secondary" href="https://github.com/altibo/SimplyAbrechnung/releases/download/v0.4.0-build.5/SimplyAbrechnung-macOS.pkg">
             <span class="platform-icon apple" aria-hidden="true">⌘</span>
-            <span><strong>Für macOS</strong><small id="mac-meta">Installationspaket</small></span>
+            <span><strong>macOS Installer</strong><small id="mac-meta">Installationspaket</small></span>
+            <span class="arrow" aria-hidden="true">↓</span>
+          </a>
+          <a id="mac-zip-download" class="download-button secondary" href="https://github.com/altibo/SimplyAbrechnung/releases">
+            <span class="platform-icon apple" aria-hidden="true">⌘</span>
+            <span><strong>macOS ZIP</strong><small id="mac-zip-meta">App als ZIP-Datei</small></span>
             <span class="arrow" aria-hidden="true">↓</span>
           </a>
         </div>

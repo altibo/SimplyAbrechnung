@@ -63,17 +63,12 @@ main {
 }
 
 .brand-mark {
-  display: grid;
   width: 42px;
   height: 42px;
-  color: white;
   border-radius: 13px;
-  background: var(--blue);
   box-shadow: 0 9px 22px rgba(10, 75, 146, 0.24);
-  place-items: center;
+  object-fit: cover;
 }
-
-.brand-mark svg { width: 28px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 2.2; }
 
 .eyebrow {
   margin: 0 0 18px;
