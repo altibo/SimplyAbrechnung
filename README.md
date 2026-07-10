@@ -1,85 +1,38 @@
-# SimplyAbrechnung
+# SimplyAbrechnung Web
 
-SimplyAbrechnung ist eine bewusst einfache, lokale Patientenkartei mit PDF-Rechnungen für eine kleine Privatpraxis. Die Anwendung benötigt keinen Server und keine Cloud und nutzt eine moderne Qt-Oberfläche.
+SimplyAbrechnung wird als lokale, installierbare Webanwendung (PWA) neu entwickelt. Der Server liefert ausschließlich statische Anwendungsdateien aus. Patienten-, Diagnose-, Leistungs-, Rechnungs- und Zahlungsdaten werden ausschließlich lokal im Browser beziehungsweise in einem vom Benutzer freigegebenen Praxisordner verarbeitet.
 
-Website und Downloads: **https://altibo.github.io/SimplyAbrechnung/**
+Der bisherige Desktopstand 0.5.0 ist dauerhaft im Branch [`legacy/desktop-v0.5.0`](../../tree/legacy/desktop-v0.5.0) gesichert.
 
-Aktuelle Programmversion: **0.5.0**
+## Zielbild
 
-## Funktionen
+- installierbare Progressive Web App
+- offline nutzbar nach dem ersten Laden
+- kein Backend für Patientendaten
+- keine Cloud-Datenbank
+- SQLite als lokale Datenbank über WebAssembly
+- lokale PDF-Erzeugung für Rechnungen und Mahnungen
+- lokale verschlüsselte Backups
+- Migration der vorhandenen JSON-Daten
+- unterstützte Desktopbrowser zunächst Chrome und Edge
 
-- eine menschenlesbare JSON-Datei je Patient
-- persönliche Daten, Diagnose, freie Notizen und datierte Behandlungen
-- Kennzeichnung als Privat- oder Kassenpatient
-- moderne Qt-Oberfläche mit Kartenlayout, klaren Tabellen und skalierbaren Bereichen
-- offene Leistungen per Doppelklick oder Schaltfläche bearbeiten, inklusive sichtbarer Zusatznotiz
-- scrollbare Langtextfelder für freie Notizen und Zusatznotizen zu Leistungen
-- zentraler, in der Anwendung bearbeitbarer GOÄ-Leistungskatalog
-- nur noch offene Positionen werden in die nächste Rechnung übernommen
-- automatische fortlaufende Rechnungsnummer
-- Rechnungsübersicht mit Zahlungsstatus, Zahlungsdatum und offenen Beträgen
-- Jahresübersicht mit Gesamt-, Bezahlt- und Offen-Summen
-- PDF-Zahlungserinnerungen für offene Rechnungen
-- aussagekräftige Rechnungsdateinamen mit Patient und Datum
-- PDF-Rechnung mit schlichtem Default-Logo, optionalem eigenem Praxislogo und einstellbarer Akzentfarbe
-- eigener JSON-Datensatz mit Zahlungshistorie zu jeder erstellten Rechnung
-- automatische Sicherungskopien vor Änderungen
-- sichtbare Versionsnummer in Fenstertitel und Symbolleiste
+## Sicherheitsprinzip
 
-## Bedienung
+Der Hostingserver darf nur statische Dateien erhalten und ausliefern. Patientendaten dürfen weder in Requests noch in Logs, Telemetrie, Fehlerberichten oder externen Diensten erscheinen.
 
-1. Unter **Praxis-Einstellungen** die Praxis-, Bank- und Rechnungsdaten prüfen.
-2. Einen Patienten anlegen und speichern.
-3. Über **Leistung eintragen** datierte GOÄ-Positionen hinzufügen.
-4. **Rechnung aus offenen Positionen erstellen** wählen.
-5. Unter **Rechnungsübersicht** Zahlungen erfassen, Jahreszahlen prüfen oder eine Zahlungserinnerung erstellen.
+## Dokumentation
 
-Die Anwendung speichert ihre Daten unter `SimplyAbrechnung_Daten` im Benutzerordner. Darin liegen:
-
-```text
-SimplyAbrechnung_Daten/
-├── praxis_config.json
-├── goae_positionen.json
-├── praxis_logo.png        # optional, nur wenn ein eigenes Logo gewählt wurde
-├── patienten/
-├── rechnungen/
-└── sicherungen/
-```
-
-Unter **Praxis-Einstellungen** kann ein eigenes Logo ausgewählt werden. Die App kopiert es in den Datenordner und verwendet es ab dann für neue Rechnungen. Ohne eigenes Logo wird ein neutrales Default-Logo erzeugt. Die Akzentfarbe der Rechnung ist dort ebenfalls einstellbar.
-
-Das bisherige Vorlagen-Logo wird nicht mehr in die Installationspakete übernommen.
-
-## Datenschutz und Datensicherung
-
-Die Dateien enthalten besonders schützenswerte Gesundheitsdaten und sind absichtlich menschenlesbar, aber nicht zusätzlich durch das Programm verschlüsselt. Der Rechner sollte deshalb ein geschütztes Benutzerkonto, Festplattenverschlüsselung und eine verschlüsselte Datensicherung verwenden. Der gesamte Ordner `SimplyAbrechnung_Daten` muss regelmäßig gesichert werden.
-
-Vor dem produktiven Einsatz müssen Praxis und Abrechnungsfachkraft den GOÄ-Katalog, Pflichtangaben, Steuernummern-Hinweise, Steigerungsfaktoren und Begründungstexte prüfen. Mehrere Beträge der gelieferten Vorlage enthielten ausdrücklich Fragezeichen; diese Hinweise wurden in den Katalog übernommen.
+- [Produktanforderungen](docs/PRODUCT_REQUIREMENTS.md)
+- [Architektur](docs/ARCHITECTURE.md)
+- [Datenmodell](docs/DATA_MODEL.md)
+- [Sicherheit und Datenschutz](docs/SECURITY.md)
+- [Migration der Desktopdaten](docs/MIGRATION.md)
+- [Roadmap](docs/ROADMAP.md)
 
 ## Entwicklung
 
-Python 3.11 oder neuer wird benötigt.
+Die neue Webanwendung soll unter `web/` aufgebaut werden. Die bisherige Python-/Qt-Implementierung bleibt vorübergehend auf `main` als fachliche und technische Referenz erhalten. Sobald Importer, PDF-Vergleichstests und die neue Grundstruktur verfügbar sind, kann der Altcode aus `main` entfernt werden; er bleibt im Legacy-Branch erhalten.
 
-```powershell
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-python -m pip install -r requirements-dev.txt
-python -m simply_abrechnung
-pytest
-pyinstaller --noconfirm --clean SimplyAbrechnung.spec
-```
+## Zweckbestimmung
 
-Unter macOS wird die virtuelle Umgebung mit `source .venv/bin/activate` aktiviert. Nicht signierte macOS-Builds können beim ersten Start eine Gatekeeper-Warnung auslösen.
-
-## Installation und Updates
-
-- Unter Windows `SimplyAbrechnung-Windows-Setup.exe` aus dem Release starten.
-- Unter macOS `SimplyAbrechnung-macOS.pkg` öffnen; die App wird nach `/Applications` installiert.
-- Eine neue Installer-Version ersetzt die vorhandene Installation automatisch.
-- Der Datenordner `SimplyAbrechnung_Daten` im Benutzerordner bleibt bei Installation und Update unverändert.
-
-Wer bisher die portable Windows-Datei aus einem ZIP verwendet hat, installiert die neue Setup-Version einmalig und kann die alte portable Datei danach entfernen.
-
-## Veröffentlichungen
-
-Jeder Push auf `main` testet und baut die Anwendung auf Windows und macOS. GitHub Actions stellt einen Windows-Setup-Assistenten und ein macOS-Installationspaket als Build-Artefakte bereit und erzeugt zusätzlich eine neue Vorabveröffentlichung mit einer eindeutigen Build-Nummer.
+Die Software dient der lokalen Speicherung, Darstellung und Verwaltung patientenbezogener Dokumentations-, Diagnose-, Leistungs- und Abrechnungsdaten. Sie führt keine diagnostische oder therapeutische Analyse durch und gibt keine Empfehlungen für medizinische Entscheidungen.
